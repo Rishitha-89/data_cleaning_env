@@ -1,3 +1,12 @@
+---
+title: Data Cleaning Env
+emoji: 🧹
+colorFrom: blue
+colorTo: green
+sdk: docker
+pinned: false
+---
+
 # 🧹 Data Cleaning Environment
 
 A real-world OpenEnv environment where an AI agent learns to clean messy datasets.
@@ -29,10 +38,8 @@ The agent receives a dirty dataset and must clean it by fixing:
 - Partial credit for each fix applied correctly
 
 ## Setup
-```bash
 pip install -r requirements.txt
 python inference.py
-```
 
 ## Baseline Scores
 | Task | Score |
