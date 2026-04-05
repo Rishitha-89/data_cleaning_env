@@ -1,0 +1,32 @@
+name: data-cleaning-env
+version: 1.0.0
+description: >
+  A real-world OpenEnv environment where an AI agent learns to clean
+  messy datasets. Tasks range from filling missing values (easy) to
+  handling outliers, duplicates, and inconsistent formats (hard).
+author: your-team-name
+tasks:
+  - id: easy
+    description: Fix missing values in employee dataset
+    difficulty: easy
+  - id: medium
+    description: Fix duplicates, wrong types, missing values in customer dataset
+    difficulty: medium
+  - id: hard
+    description: Fix outliers, inconsistent formats, invalid values in product dataset
+    difficulty: hard
+observation_space:
+  task_id: string
+  description: string
+  difficulty: string
+  issues: list
+  dirty_data: string
+  step_count: integer
+  done: boolean
+action_space:
+  task_id: string
+  cleaned_data: string
+reward_space:
+  score: float (0.0 - 1.0)
+  passed: boolean
+  feedback: string
