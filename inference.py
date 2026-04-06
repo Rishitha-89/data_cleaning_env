@@ -28,56 +28,78 @@ Common issues to fix:
 
 def get_llm_cleaning(dirty_csv: str, description: str) -> str:
     """Ask LLM to clean the dataset"""
-    response = client.chat.completions.create(
-        model=MODEL_NAME,
-        messages=[
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": f"Task: {description}\n\nDirty data:\n{dirty_csv}\n\nReturn only the cleaned CSV:"}
-        ],
-        temperature=0.1,
-        max_tokens=1000
-    )
-    return response.choices[0].message.content.strip()
+    try:
+        response = client.chat.completions.create(
+            model=MODEL_NAME,
+            messages=[
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": f"Task: {description}\n\nDirty data:\n{dirty_csv}\n\nReturn only the cleaned CSV:"}
+            ],
+            temperature=0.1,
+            max_tokens=1000
+        )
+        return response.choices[0].message.content.strip()
+    except Exception as e:
+        return ""
+
+# ── Logging Helpers (MANDATORY FORMAT) ───────────────────────────────────────
+def log_start(task: str, env: str, model: str) -> None:
+    print(f"[START] task={task} env={env} model={model}", flush=True)
+
+def log_step(step: int, action: str, reward: float, done: bool, error: str) -> None:
+    error_val = error if error else "null"
+    done_val = str(done).lower()
+    print(f"[STEP] step={step} action={action} reward={reward:.2f} done={done_val} error={error_val}", flush=True)
+
+def log_end(success: bool, steps: int, score: float, rewards: list) -> None:
+    rewards_str = ",".join(f"{r:.2f}" for r in rewards)
+    print(f"[END] success={str(success).lower()} steps={steps} score={score:.3f} rewards={rewards_str}", flush=True)
 
 # ── Main ─────────────────────────────────────────────────────────────────────
 def main():
     env = DataCleaningEnv()
-    total_score = 0.0
-    results = []
+    rewards = []
+    steps_taken = 0
+    score = 0.0
+    success = False
 
-    print("🚀 Running baseline inference...\n")
+    log_start(task="data-cleaning", env="data-cleaning-env", model=MODEL_NAME)
 
-    for task in env.tasks:
-        print(f"📋 Task: {task['task_id']} ({task['difficulty']})")
+    try:
+        for i, task in enumerate(env.tasks):
+            step = i + 1
+            steps_taken = step
 
-        dirty_csv = task["dirty_df"].to_csv(index=False)
-        cleaned_csv = get_llm_cleaning(dirty_csv, task["description"])
+            # Get the AI's cleaned data
+            dirty_csv = task["dirty_df"].to_csv(index=False)
+            cleaned_csv = get_llm_cleaning(dirty_csv, task["description"])
 
-        action = Action(
-            task_id=task["task_id"],
-            cleaned_data=cleaned_csv
-        )
+            action = Action(
+                task_id=task["task_id"],
+                cleaned_data=cleaned_csv
+            )
 
-        obs, reward, done, info = env.step(action) if env.current_task else (None, None, None, None)
+            # Reset the environment first, then manually point it to the current task
+            env.reset()
+            env.current_task = task 
+            
+            # Take the step
+            obs, reward, done, info = env.step(action)
 
-        # Reset and step properly
-        env.reset()
-        obs, reward, done, info = env.step(action)
+            # Log the step. We use a short action name because full CSVs break the "no newlines" rule.
+            action_name = f"clean_{task['task_id']}_dataset"
+            log_step(step=step, action=action_name, reward=reward.score, done=done, error=None)
 
-        print(f"   Score: {reward.score}")
-        print(f"   Passed: {reward.passed}")
-        print(f"   Feedback: {reward.feedback}\n")
+            rewards.append(reward.score)
 
-        total_score += reward.score
-        results.append({
-            "task": task["task_id"],
-            "score": reward.score,
-            "passed": reward.passed
-        })
+        # Calculate final score
+        score = sum(rewards) / len(env.tasks)
+        success = score > 0.5
 
-    avg_score = total_score / len(env.tasks)
-    print(f"✅ Average Score: {avg_score:.2f}")
-    print(f"📊 Results: {results}")
+    except Exception as e:
+        print(f"[DEBUG] Error occurred: {e}")
+    finally:
+        log_end(success=success, steps=steps_taken, score=score, rewards=rewards)
 
 if __name__ == "__main__":
     main()
