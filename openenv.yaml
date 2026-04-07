@@ -5,16 +5,21 @@ description: >
   messy datasets. Tasks range from filling missing values (easy) to
   handling outliers, duplicates, and inconsistent formats (hard).
 author: your-team-name
+
 tasks:
   - id: easy
     description: Fix missing values in employee dataset
     difficulty: easy
+    grader: data_cleaning_env.graders:grade
   - id: medium
     description: Fix duplicates, wrong types, missing values in customer dataset
     difficulty: medium
+    grader: data_cleaning_env.graders:grade
   - id: hard
     description: Fix outliers, inconsistent formats, invalid values in product dataset
     difficulty: hard
+    grader: data_cleaning_env.graders:grade
+
 observation_space:
   task_id: string
   description: string
@@ -23,10 +28,12 @@ observation_space:
   dirty_data: string
   step_count: integer
   done: boolean
+
 action_space:
   task_id: string
   cleaned_data: string
+
 reward_space:
-  score: float (0.0 - 1.0)
+  score: float
   passed: boolean
   feedback: string
