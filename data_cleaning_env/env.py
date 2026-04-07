@@ -13,7 +13,7 @@ class Observation(BaseModel):
     dirty_data: str
     step_count: int
     done: bool
-    previous_score: float = 0.01  # STRICT FIX: Set baseline to 0.01
+    previous_score: float = 0.01
 
 class Action(BaseModel):
     task_id: str
@@ -28,15 +28,22 @@ class Reward(BaseModel):
 class DataCleaningEnv:
     def __init__(self):
         self.tasks = get_all_tasks()
+        self.current_task_idx = 0  # NEW: Tracks task rotation to show all 3 tasks to the bot
         self.current_task = None
         self.step_count = 0
         self.done = False
         self.max_steps = 10
-        self.previous_score = 0.01  # STRICT FIX: Set baseline to 0.01
-        self.best_score = 0.01      # STRICT FIX: Set baseline to 0.01
+        self.previous_score = 0.01
+        self.best_score = 0.01
 
-    def reset(self) -> Observation:
-        self.current_task = self.tasks[0]
+    def reset(self, task_id: str = None, **kwargs) -> Observation:
+        # FIX: Allow the automated bot to discover all 3 tasks
+        if task_id:
+            self.current_task = next((t for t in self.tasks if t["task_id"] == task_id), self.tasks[0])
+        else:
+            self.current_task = self.tasks[self.current_task_idx]
+            self.current_task_idx = (self.current_task_idx + 1) % len(self.tasks)
+            
         self.step_count = 0
         self.done = False
         self.previous_score = 0.01
@@ -50,12 +57,10 @@ class DataCleaningEnv:
         self.step_count += 1
         task = next((t for t in self.tasks if t["task_id"] == action.task_id), None)
         
-        # STRICT FIX: If task is invalid, return 0.01 instead of 0.0
         if task is None:
             reward = Reward(score=0.01, passed=False, feedback="Invalid task_id", improvement=0.0)
             return self._make_observation(), reward, True, {}
             
-        # STRICT FIX: If the AI returns a completely broken CSV, return 0.01 instead of 0.0
         try:
             agent_df = pd.read_csv(pd.io.common.StringIO(action.cleaned_data))
         except Exception as e:
@@ -64,12 +69,9 @@ class DataCleaningEnv:
             
         result = grade(action.task_id, agent_df, task["clean_df"])
         
-        # Calculate improvement over previous attempt
         improvement = round(result["score"] - self.previous_score, 2)
         
-        # Penalize infinite loops / no improvement
         if self.step_count > 3 and improvement <= 0:
-            # STRICT FIX: Never let a penalty drop the score below 0.01
             result["score"] = max(0.01, result["score"] - 0.05)
             result["feedback"] += " ⚠️ Penalty: No improvement detected"
             
