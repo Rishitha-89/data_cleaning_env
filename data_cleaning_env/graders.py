@@ -45,9 +45,10 @@ def score_easy_task(agent_df: pd.DataFrame, clean_df: pd.DataFrame) -> float:
         except Exception:
             pass
     except Exception:
-        return 0.0
+        return 0.01
         
-    return round(min(score, 1.0), 2)
+    # STRICT CONSTRAINT FIX: Cap at 0.99, floor at 0.01
+    return max(0.01, min(round(score, 2), 0.99))
 
 def score_medium_task(agent_df: pd.DataFrame, clean_df: pd.DataFrame) -> float:
     score = 0.0
@@ -70,7 +71,7 @@ def score_medium_task(agent_df: pd.DataFrame, clean_df: pd.DataFrame) -> float:
             if pd.api.types.is_numeric_dtype(agent_df["age"]):
                 score += 0.20
             elif agent_df["age"].apply(lambda x: str(x).isdigit()).sum() > 3:
-                score += 0.10 # partial: at least some values are numeric
+                score += 0.10 # partial credit
         except Exception:
             pass
             
@@ -92,9 +93,10 @@ def score_medium_task(agent_df: pd.DataFrame, clean_df: pd.DataFrame) -> float:
         except Exception:
             pass
     except Exception:
-        return 0.0
+        return 0.01
         
-    return round(min(score, 1.0), 2)
+    # STRICT CONSTRAINT FIX: Cap at 0.99, floor at 0.01
+    return max(0.01, min(round(score, 2), 0.99))
 
 def score_hard_task(agent_df: pd.DataFrame, clean_df: pd.DataFrame) -> float:
     score = 0.0
@@ -156,9 +158,10 @@ def score_hard_task(agent_df: pd.DataFrame, clean_df: pd.DataFrame) -> float:
         except Exception:
             pass
     except Exception:
-        return 0.0
+        return 0.01
         
-    return round(min(score, 1.0), 2)
+    # STRICT CONSTRAINT FIX: Cap at 0.99, floor at 0.01
+    return max(0.01, min(round(score, 2), 0.99))
 
 def grade(task_id: str, agent_df: pd.DataFrame, clean_df: pd.DataFrame) -> Dict[str, Any]:
     if task_id == "easy":
@@ -171,7 +174,7 @@ def grade(task_id: str, agent_df: pd.DataFrame, clean_df: pd.DataFrame) -> Dict[
         score = score_hard_task(agent_df, clean_df)
         threshold = 0.45
     else:
-        return {"score": 0.0, "passed": False, "feedback": "Unknown task"}
+        return {"score": 0.01, "passed": False, "feedback": "Unknown task"}
         
     return {
         "score": score,
