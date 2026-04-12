@@ -2,12 +2,17 @@
 Grading logic for the Data Cleaning Environment.
 
 Each grader scores the agent's cleaned dataset against the expected output.
-Scores are between 0.0 and 1.0 with partial credit for partial progress.
+Scores are strictly between 0.0 and 1.0 (exclusive) with partial credit.
 """
 from __future__ import annotations
 import pandas as pd
 import numpy as np
 from typing import Dict, Any
+
+
+def _clamp(score: float) -> float:
+    """Ensure score is strictly between 0 and 1 (exclusive)."""
+    return max(0.01, min(round(score, 2), 0.99))
 
 
 def score_easy_task(agent_df: pd.DataFrame, clean_df: pd.DataFrame) -> float:
@@ -29,7 +34,7 @@ def score_easy_task(agent_df: pd.DataFrame, clean_df: pd.DataFrame) -> float:
         if missing == 0:
             score += 0.30
         elif missing <= 2:
-            score += 0.15  # Partial credit for mostly clean data
+            score += 0.15  # Partial credit
 
         # Check 2: Age filled correctly (within 1.0 tolerance)
         try:
@@ -67,7 +72,7 @@ def score_easy_task(agent_df: pd.DataFrame, clean_df: pd.DataFrame) -> float:
     except Exception:
         return 0.01
 
-    return max(0.01, min(round(score, 2), 0.99))
+    return _clamp(score)
 
 
 def score_medium_task(agent_df: pd.DataFrame, clean_df: pd.DataFrame) -> float:
@@ -127,7 +132,7 @@ def score_medium_task(agent_df: pd.DataFrame, clean_df: pd.DataFrame) -> float:
     except Exception:
         return 0.01
 
-    return max(0.01, min(round(score, 2), 0.99))
+    return _clamp(score)
 
 
 def score_hard_task(agent_df: pd.DataFrame, clean_df: pd.DataFrame) -> float:
@@ -209,7 +214,7 @@ def score_hard_task(agent_df: pd.DataFrame, clean_df: pd.DataFrame) -> float:
     except Exception:
         return 0.01
 
-    return max(0.01, min(round(score, 2), 0.99))
+    return _clamp(score)
 
 
 def grade(task_id: str, agent_df: pd.DataFrame, clean_df: pd.DataFrame) -> Dict[str, Any]:
@@ -222,7 +227,8 @@ def grade(task_id: str, agent_df: pd.DataFrame, clean_df: pd.DataFrame) -> Dict[
         clean_df: The expected clean DataFrame
     
     Returns:
-        Dict with score (0.0-1.0), passed (bool), and feedback (str)
+        Dict with score strictly between 0 and 1 (exclusive),
+        passed (bool), and feedback (str)
     """
     if task_id == "easy":
         score = score_easy_task(agent_df, clean_df)
@@ -243,7 +249,10 @@ def grade(task_id: str, agent_df: pd.DataFrame, clean_df: pd.DataFrame) -> Dict[
             "feedback": f"Unknown task_id: {task_id}"
         }
 
+    # Final clamp — strictly between 0 and 1
+    score = _clamp(score)
     passed = score >= threshold
+
     return {
         "score": score,
         "passed": passed,
