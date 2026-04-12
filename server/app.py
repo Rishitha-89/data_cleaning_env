@@ -62,19 +62,15 @@ def reset(task_id: str = None):
 
 @app.post("/step")
 def step(action: Action):
-    """
-    Submit cleaned data and receive reward.
-    
-    Args:
-        action: Contains task_id and cleaned_data (CSV string)
-    """
     try:
         obs, reward, done, info = env.step(action)
         return {
             "observation": obs.model_dump(),
-            "reward": reward.model_dump(),
+            "reward": reward.score,  # ← Return float directly!
             "done": done,
-            "info": info
+            "info": info,
+            "feedback": reward.feedback,
+            "passed": reward.passed
         }
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
