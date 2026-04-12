@@ -28,6 +28,16 @@ We built a reproducible, programmatically graded RL environment where AI agents 
 A well-trained agent on this environment could **automate hours of manual data cleaning work in seconds** — with direct value for data engineering, MLOps, and enterprise analytics pipelines.
 
 ---
+## 🧨 The "Nightmare" Data Engineering Challenge
+
+To properly test a frontier model like Meta's `Llama-3.3-70B`, simple NaN imputation is not enough. This environment injects severe, real-world data corruption:
+
+- **HTML & JSON Extraction:** The agent must parse text out of `<b>` tags and extract embedded dictionary values like `{"cat": "Fruit"}`.
+- **Corrupted Types:** Numeric columns contain spelled-out strings (e.g., "Twenty") that must be filtered out before calculating mathematical means.
+- **Datetime Chaos:** Dates are mixed between US, EU, and text formats (`15/02/2024`, `2024.03.20`, `May 5th 2024`) and must be strictly standardized to `YYYY-MM-DD`.
+- **Extreme Outliers:** Inventory stock levels of `-500` and prices of `$9999.0` require logical boundary clamping.
+
+---
 
 ## 🏗️ Architecture
 data-cleaning-env/
