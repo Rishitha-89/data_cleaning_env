@@ -78,6 +78,7 @@ def main():
         success = False
         last_error = None
 
+        # [START]
         print(
             f"[START] task={task_id} env=data-cleaning-env model={MODEL_NAME}",
             flush=True
@@ -85,35 +86,45 @@ def main():
 
         try:
             env.reset(task_id=task_id)
-
             dirty_csv = task["dirty_df"].to_csv(index=False)
-            cleaned_csv, error = get_llm_cleaning(dirty_csv, task["description"])
 
-            if error:
-                last_error = error
-                cleaned_csv = dirty_csv
+            # Run 3 steps per task
+            for step_num in range(1, 4):
+                cleaned_csv, error = get_llm_cleaning(
+                    dirty_csv, task["description"]
+                )
 
-            action = Action(task_id=task_id, cleaned_data=cleaned_csv)
-            obs, reward, done, info = env.step(action)
+                if error:
+                    last_error = error
+                    cleaned_csv = dirty_csv
 
-            steps = 1
-            clamped = clamp(reward.score)
-            rewards.append(clamped)
-            success = clamped >= 0.40
+                action = Action(task_id=task_id, cleaned_data=cleaned_csv)
+                obs, reward, done, info = env.step(action)
 
-            print(
-                f"[STEP] step={steps} "
-                f"action=clean_{task_id}_dataset "
-                f"reward={clamped:.3f} "
-                f"done={str(done).lower()} "
-                f"error={'null' if not last_error else last_error}",
-                flush=True
-            )
+                steps = step_num
+                clamped = clamp(reward.score)
+                rewards.append(clamped)
+                success = clamped >= 0.40
+
+                # [STEP]
+                print(
+                    f"[STEP] step={step_num} "
+                    f"action=clean_{task_id}_dataset "
+                    f"reward={clamped:.3f} "
+                    f"done={str(done).lower()} "
+                    f"error={'null' if not last_error else last_error}",
+                    flush=True
+                )
+
+                # Reset done state for next step
+                if done:
+                    env.reset(task_id=task_id)
 
         except Exception as e:
             last_error = str(e)
             steps = max(steps, 1)
-            rewards.append(0.001)
+            if not rewards:
+                rewards.append(0.001)
             print(
                 f"[STEP] step={steps} "
                 f"action=error "
@@ -125,11 +136,15 @@ def main():
 
         finally:
             safe_rewards = [clamp(r) for r in rewards]
+            avg_score = sum(safe_rewards) / len(safe_rewards)
+            avg_score = clamp(avg_score)
             rewards_str = ",".join(f"{r:.3f}" for r in safe_rewards)
 
+            # [END] with score field
             print(
                 f"[END] success={str(success).lower()} "
                 f"steps={steps} "
+                f"score={avg_score:.3f} "
                 f"rewards={rewards_str}",
                 flush=True
             )
