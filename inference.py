@@ -48,12 +48,15 @@ Common issues to fix:
 - Date formats: standardize all dates to YYYY-MM-DD format"""
 
 
-def get_llm_cleaning(dirty_csv: str, description: str) -> tuple[str, str]:
+def clamp(score: float) -> float:
+    """Ensure score is strictly between 0 and 1 exclusive."""
+    return max(0.01, min(round(float(score), 2), 0.99))
+
+
+def get_llm_cleaning(dirty_csv: str, description: str) -> tuple:
     """
     Ask LLM to clean the dataset.
-    
-    Returns:
-        Tuple of (cleaned_csv, error_message or None)
+    Returns: (cleaned_csv, error_message or None)
     """
     try:
         response = client.chat.completions.create(
@@ -88,7 +91,6 @@ def main():
     Outputs strictly formatted [START]/[STEP]/[END] lines.
     """
     env = DataCleaningEnv()
-    all_rewards = []
 
     for task in env.tasks:
         task_id = task["task_id"]
@@ -120,15 +122,17 @@ def main():
             obs, reward, done, info = env.step(action)
 
             steps = 1
-            rewards.append(reward.score)
-            success = reward.passed
+            # Clamp reward score strictly between 0 and 1
+            clamped_score = clamp(reward.score)
+            rewards.append(clamped_score)
+            success = clamped_score >= 0.45
             action_str = f"clean_{task_id}_dataset"
 
             # ── [STEP] ────────────────────────────────────────────────────────
             print(
                 f"[STEP] step={steps} "
                 f"action={action_str} "
-                f"reward={reward.score:.2f} "
+                f"reward={clamped_score:.2f} "
                 f"done={str(done).lower()} "
                 f"error={last_error if last_error else 'null'}",
                 flush=True
@@ -148,18 +152,20 @@ def main():
             )
 
         finally:
-            # ── [END] ─────────────────────────────────────────────────────────
-            env.close()
+            # Clamp all rewards before printing
+            rewards = [clamp(r) for r in rewards]
             rewards_str = ",".join(f"{r:.2f}" for r in rewards)
+
+            # ── [END] ─────────────────────────────────────────────────────────
             print(
                 f"[END] success={str(success).lower()} "
                 f"steps={steps} "
                 f"rewards={rewards_str}",
                 flush=True
             )
-            all_rewards.extend(rewards)
 
-            # Reinitialize env for next task
+            # Close and reinitialize for next task
+            env.close()
             env = DataCleaningEnv()
 
 
