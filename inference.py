@@ -1,37 +1,17 @@
-"""
-Baseline Inference Script for Data Cleaning Environment.
-
-MANDATORY VARIABLES:
-    API_BASE_URL  - API endpoint for the LLM (has default)
-    MODEL_NAME    - Model identifier (has default)
-    HF_TOKEN      - Hugging Face API token (required, no default)
-
-OUTPUT FORMAT (strictly enforced):
-    [START] task=<name> env=<benchmark> model=<model>
-    [STEP]  step=<n> action=<str> reward=<0.00> done=<bool> error=<msg|null>
-    [END]   success=<bool> steps=<n> rewards=<r1,r2,...>
-"""
 import os
 from openai import OpenAI
 from data_cleaning_env.env import DataCleaningEnv
 from data_cleaning_env.models import Action
 
-# ── Environment Variables ─────────────────────────────────────────────────────
 API_BASE_URL = os.getenv("API_BASE_URL", "https://router.huggingface.co/v1")
 MODEL_NAME = os.getenv("MODEL_NAME", "meta-llama/Llama-3.3-70B-Instruct")
 HF_TOKEN = os.getenv("HF_TOKEN")
 
-# HF_TOKEN is required — fail fast with clear message
 if HF_TOKEN is None:
     raise ValueError("HF_TOKEN environment variable is required")
 
-# ── OpenAI Client (mandatory per hackathon rules) ─────────────────────────────
-client = OpenAI(
-    base_url=API_BASE_URL,
-    api_key=HF_TOKEN
-)
+client = OpenAI(base_url=API_BASE_URL, api_key=HF_TOKEN)
 
-# ── System Prompt for Data Cleaning Agent ─────────────────────────────────────
 SYSTEM_PROMPT = """You are an expert data cleaning agent.
 You will receive a messy CSV dataset and must clean it.
 Return ONLY the cleaned CSV data — no explanations, no markdown, no code blocks.
@@ -49,15 +29,23 @@ Common issues to fix:
 
 
 def clamp(score: float) -> float:
-    """Ensure score is strictly between 0 and 1 exclusive."""
-    return max(0.01, min(round(float(score), 2), 0.99))
+    """
+    Strictly clamp score between 0 and 1 exclusive.
+    Never returns exactly 0.0 or 1.0.
+    """
+    try:
+        s = float(score)
+        s = round(s, 2)
+        if s <= 0.0:
+            return 0.01
+        if s >= 1.0:
+            return 0.99
+        return s
+    except Exception:
+        return 0.01
 
 
 def get_llm_cleaning(dirty_csv: str, description: str) -> tuple:
-    """
-    Ask LLM to clean the dataset.
-    Returns: (cleaned_csv, error_message or None)
-    """
     try:
         response = client.chat.completions.create(
             model=MODEL_NAME,
@@ -76,7 +64,6 @@ def get_llm_cleaning(dirty_csv: str, description: str) -> tuple:
             max_tokens=1000
         )
         cleaned = response.choices[0].message.content.strip()
-        # Remove markdown code blocks if model added them
         if cleaned.startswith("```"):
             cleaned = cleaned.split("\n", 1)[1]
             cleaned = cleaned.rsplit("```", 1)[0].strip()
@@ -86,10 +73,6 @@ def get_llm_cleaning(dirty_csv: str, description: str) -> tuple:
 
 
 def main():
-    """
-    Run baseline agent against all 3 tasks.
-    Outputs strictly formatted [START]/[STEP]/[END] lines.
-    """
     env = DataCleaningEnv()
 
     for task in env.tasks:
@@ -99,42 +82,37 @@ def main():
         success = False
         last_error = None
 
-        # ── [START] ───────────────────────────────────────────────────────────
         print(
             f"[START] task={task_id} env=data-cleaning-env model={MODEL_NAME}",
             flush=True
         )
 
         try:
-            # Reset environment for this task
             env.reset(task_id=task_id)
 
-            # Get dirty data and ask LLM to clean it
             dirty_csv = task["dirty_df"].to_csv(index=False)
             cleaned_csv, error = get_llm_cleaning(dirty_csv, task["description"])
 
             if error:
                 last_error = error
-                cleaned_csv = dirty_csv  # Fallback to dirty data
+                cleaned_csv = dirty_csv
 
-            # Submit cleaned data to environment
             action = Action(task_id=task_id, cleaned_data=cleaned_csv)
             obs, reward, done, info = env.step(action)
 
             steps = 1
-            # Clamp reward score strictly between 0 and 1
-            clamped_score = clamp(reward.score)
-            rewards.append(clamped_score)
-            success = clamped_score >= 0.45
-            action_str = f"clean_{task_id}_dataset"
 
-            # ── [STEP] ────────────────────────────────────────────────────────
+            # CLAMP HERE — before anything else
+            clamped = clamp(reward.score)
+            rewards.append(clamped)
+            success = clamped >= 0.45
+
             print(
                 f"[STEP] step={steps} "
-                f"action={action_str} "
-                f"reward={clamped_score:.2f} "
+                f"action=clean_{task_id}_dataset "
+                f"reward={clamped:.2f} "
                 f"done={str(done).lower()} "
-                f"error={last_error if last_error else 'null'}",
+                f"error={'null' if not last_error else last_error}",
                 flush=True
             )
 
@@ -152,11 +130,13 @@ def main():
             )
 
         finally:
-            # Clamp all rewards before printing
-            rewards = [clamp(r) for r in rewards]
-            rewards_str = ",".join(f"{r:.2f}" for r in rewards)
+            # CLAMP AGAIN — every single reward before printing
+            safe_rewards = [clamp(r) for r in rewards]
+            rewards_str = ",".join(f"{r:.2f}" for r in safe_rewards)
 
-            # ── [END] ─────────────────────────────────────────────────────────
+            # Double check — replace any 0.00 or 1.00 strings
+            rewards_str = rewards_str.replace("0.00", "0.01").replace("1.00", "0.99")
+
             print(
                 f"[END] success={str(success).lower()} "
                 f"steps={steps} "
@@ -164,7 +144,6 @@ def main():
                 flush=True
             )
 
-            # Close and reinitialize for next task
             env.close()
             env = DataCleaningEnv()
 
