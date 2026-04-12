@@ -50,11 +50,11 @@ def step(action: Action):
         obs, reward, done, info = env.step(action)
         return {
             "observation": obs.model_dump(),
-            "reward": reward.score,
-            "done": done,
+            "reward": float(reward.score),
+            "done": bool(done),
             "info": info,
-            "feedback": reward.feedback,
-            "passed": reward.passed
+            "feedback": str(reward.feedback),
+            "passed": bool(reward.passed)
         }
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

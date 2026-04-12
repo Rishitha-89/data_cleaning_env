@@ -5,17 +5,17 @@ from typing import Dict, Any
 
 
 def _clamp(score: float) -> float:
-    """Score must be strictly between 0 and 1 exclusive."""
+    """Score must be strictly between 0 and 1 exclusive. Always returns float."""
     try:
         s = float(score)
         s = round(s, 2)
         if s <= 0.0:
-            return 0.01
+            return float(0.01)
         if s >= 1.0:
-            return 0.99
-        return s
+            return float(0.99)
+        return float(s)
     except Exception:
-        return 0.01
+        return float(0.01)
 
 
 def score_easy_task(agent_df: pd.DataFrame, clean_df: pd.DataFrame) -> float:
@@ -62,9 +62,8 @@ def score_easy_task(agent_df: pd.DataFrame, clean_df: pd.DataFrame) -> float:
             pass
 
     except Exception:
-        return 0.01
+        return float(0.01)
 
-    # Max possible = 0.29+0.24+0.24+0.10+0.10 = 0.97
     return _clamp(score)
 
 
@@ -107,14 +106,13 @@ def score_medium_task(agent_df: pd.DataFrame, clean_df: pd.DataFrame) -> float:
         try:
             ages = pd.to_numeric(agent_df["age"], errors="coerce")
             valid = ages.between(18, 100).sum()
-            score += 0.16 * (valid / len(ages))
+            score += 0.16 * (float(valid) / float(len(ages)))
         except Exception:
             pass
 
     except Exception:
-        return 0.01
+        return float(0.01)
 
-    # Max possible = 0.24+0.19+0.19+0.19+0.16 = 0.97
     return _clamp(score)
 
 
@@ -131,7 +129,7 @@ def score_hard_task(agent_df: pd.DataFrame, clean_df: pd.DataFrame) -> float:
         try:
             names = agent_df["product_name"].dropna().tolist()
             title_count = sum(1 for n in names if n == n.title())
-            score += 0.14 * (title_count / len(names))
+            score += 0.14 * (float(title_count) / float(len(names)))
         except Exception:
             pass
 
@@ -139,16 +137,16 @@ def score_hard_task(agent_df: pd.DataFrame, clean_df: pd.DataFrame) -> float:
         try:
             stock = agent_df["stock"].dropna()
             valid = (stock >= 0).sum()
-            score += 0.14 * (valid / len(stock))
+            score += 0.14 * (float(valid) / float(len(stock)))
         except Exception:
             pass
 
         # Check 4: Outlier price replaced (0.14)
         try:
             prices = agent_df["price"].dropna()
-            if prices.max() < 100:
+            if float(prices.max()) < 100:
                 score += 0.14
-            elif prices.max() < 500:
+            elif float(prices.max()) < 500:
                 score += 0.07
         except Exception:
             pass
@@ -169,7 +167,7 @@ def score_hard_task(agent_df: pd.DataFrame, clean_df: pd.DataFrame) -> float:
                 1 for d in dates
                 if str(d).count("-") == 2 and len(str(d)) == 10
             )
-            score += 0.14 * (consistent / len(dates))
+            score += 0.14 * (float(consistent) / float(len(dates)))
         except Exception:
             pass
 
@@ -177,14 +175,13 @@ def score_hard_task(agent_df: pd.DataFrame, clean_df: pd.DataFrame) -> float:
         try:
             ratings = agent_df["rating"].dropna()
             valid = ratings.between(1.0, 5.0).sum()
-            score += 0.13 * (valid / len(ratings))
+            score += 0.13 * (float(valid) / float(len(ratings)))
         except Exception:
             pass
 
     except Exception:
-        return 0.01
+        return float(0.01)
 
-    # Max possible = 0.14*6 + 0.13 = 0.97
     return _clamp(score)
 
 
@@ -199,12 +196,17 @@ def grade(task_id: str, agent_df: pd.DataFrame, clean_df: pd.DataFrame) -> Dict[
         score = score_hard_task(agent_df, clean_df)
         threshold = 0.40
     else:
-        return {"score": 0.01, "passed": False, "feedback": f"Unknown task_id: {task_id}"}
+        return {
+            "score": float(0.01),
+            "passed": False,
+            "feedback": f"Unknown task_id: {task_id}"
+        }
 
     score = _clamp(score)
-    passed = score >= threshold
+    passed = bool(score >= threshold)
+
     return {
-        "score": score,
+        "score": float(score),
         "passed": passed,
         "feedback": (
             f"Task '{task_id}' scored {score:.2f}/1.0 — "

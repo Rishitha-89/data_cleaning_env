@@ -18,10 +18,10 @@ class Observation(BaseModel):
     def clamp_previous_score(cls, v):
         s = float(v)
         if s <= 0.0:
-            return 0.01
+            return float(0.01)
         if s >= 1.0:
-            return 0.99
-        return round(s, 2)
+            return float(0.99)
+        return float(round(s, 2))
 
 
 class Action(BaseModel):
@@ -40,7 +40,12 @@ class Reward(BaseModel):
     def clamp_score(cls, v):
         s = float(v)
         if s <= 0.0:
-            return 0.01
+            return float(0.01)
         if s >= 1.0:
-            return 0.99
-        return round(s, 2)
+            return float(0.99)
+        return float(round(s, 2))
+
+    @field_validator("improvement", mode="before")
+    @classmethod
+    def clamp_improvement(cls, v):
+        return float(round(float(v), 2))
