@@ -25,9 +25,17 @@ class Action(BaseModel):
     cleaned_data: str               # CSV string of cleaned dataset
 
 
+from pydantic import BaseModel, field_validator
+
 class Reward(BaseModel):
     """Feedback after each action."""
-    score: float                    # 0.0 to 1.0
-    passed: bool                    # Did agent meet passing threshold?
-    feedback: str                   # Human readable feedback
-    improvement: float = 0.0       # Score improvement from last step
+    score: float
+    passed: bool
+    feedback: str
+    improvement: float = 0.0
+
+    @field_validator("score")
+    @classmethod
+    def score_must_be_strictly_between_0_and_1(cls, v):
+        """Strictly enforce score is between 0 and 1 exclusive."""
+        return max(0.01, min(round(v, 2), 0.99))
