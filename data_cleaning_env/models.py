@@ -1,41 +1,37 @@
-"""
-Pydantic models for the Data Cleaning Environment.
-Defines the Observation, Action, and Reward types.
-"""
 from __future__ import annotations
-from typing import List, Optional
-from pydantic import BaseModel
+from typing import List
+from pydantic import BaseModel, field_validator
 
 
 class Observation(BaseModel):
-    """What the agent sees at each step."""
-    task_id: str                    # Which task: easy, medium, hard
-    description: str                # Natural language task description
-    difficulty: str                 # easy, medium, or hard
-    issues: List[str]               # List of issues to fix
-    dirty_data: str                 # CSV string of messy dataset
-    step_count: int                 # How many steps taken so far
-    done: bool                      # Is episode over?
-    previous_score: float = 0.0    # Score from last step
+    task_id: str
+    description: str
+    difficulty: str
+    issues: List[str]
+    dirty_data: str
+    step_count: int
+    done: bool
+    previous_score: float = 0.01
 
 
 class Action(BaseModel):
-    """What the agent does — submit cleaned data."""
-    task_id: str                    # Which task this action is for
-    cleaned_data: str               # CSV string of cleaned dataset
+    task_id: str
+    cleaned_data: str
 
-
-from pydantic import BaseModel, field_validator
 
 class Reward(BaseModel):
-    """Feedback after each action."""
     score: float
     passed: bool
     feedback: str
     improvement: float = 0.0
 
-    @field_validator("score")
+    @field_validator("score", mode="before")
     @classmethod
-    def score_must_be_strictly_between_0_and_1(cls, v):
-        """Strictly enforce score is between 0 and 1 exclusive."""
-        return max(0.01, min(round(v, 2), 0.99))
+    def clamp_score(cls, v):
+        """Strictly enforce score between 0 and 1 exclusive."""
+        return max(0.01, min(round(float(v), 2), 0.99))
+
+    @field_validator("improvement", mode="before")
+    @classmethod
+    def clamp_improvement(cls, v):
+        return round(float(v), 2)
