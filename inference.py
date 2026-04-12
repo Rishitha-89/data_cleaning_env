@@ -31,14 +31,14 @@ Common issues to fix:
 def clamp(score: float) -> float:
     try:
         s = float(score)
-        s = round(s, 2)
+        s = round(s, 3)
         if s <= 0.0:
-            return 0.01
+            return float(0.001)
         if s >= 1.0:
-            return 0.99
-        return s
+            return float(0.99)
+        return float(s)
     except Exception:
-        return 0.01
+        return float(0.001)
 
 
 def get_llm_cleaning(dirty_csv: str, description: str) -> tuple:
@@ -104,7 +104,7 @@ def main():
             print(
                 f"[STEP] step={steps} "
                 f"action=clean_{task_id}_dataset "
-                f"reward={clamped:.2f} "
+                f"reward={clamped:.3f} "
                 f"done={str(done).lower()} "
                 f"error={'null' if not last_error else last_error}",
                 flush=True
@@ -113,11 +113,11 @@ def main():
         except Exception as e:
             last_error = str(e)
             steps = max(steps, 1)
-            rewards.append(0.01)
+            rewards.append(0.001)
             print(
                 f"[STEP] step={steps} "
                 f"action=error "
-                f"reward=0.01 "
+                f"reward=0.001 "
                 f"done=true "
                 f"error={last_error}",
                 flush=True
@@ -125,7 +125,7 @@ def main():
 
         finally:
             safe_rewards = [clamp(r) for r in rewards]
-            rewards_str = ",".join(f"{r:.2f}" for r in safe_rewards)
+            rewards_str = ",".join(f"{r:.3f}" for r in safe_rewards)
 
             print(
                 f"[END] success={str(success).lower()} "

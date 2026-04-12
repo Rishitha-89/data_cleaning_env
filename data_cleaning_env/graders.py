@@ -5,17 +5,17 @@ from typing import Dict, Any
 
 
 def _clamp(score: float) -> float:
-    """Score must be strictly between 0 and 1 exclusive. Always returns float."""
+    """Score must be strictly between 0 and 1 exclusive."""
     try:
         s = float(score)
-        s = round(s, 2)
+        s = round(s, 3)
         if s <= 0.0:
-            return float(0.01)
+            return float(0.001)
         if s >= 1.0:
             return float(0.99)
         return float(s)
     except Exception:
-        return float(0.01)
+        return float(0.001)
 
 
 def score_easy_task(agent_df: pd.DataFrame, clean_df: pd.DataFrame) -> float:
@@ -62,7 +62,7 @@ def score_easy_task(agent_df: pd.DataFrame, clean_df: pd.DataFrame) -> float:
             pass
 
     except Exception:
-        return float(0.01)
+        return float(0.001)
 
     return _clamp(score)
 
@@ -111,7 +111,7 @@ def score_medium_task(agent_df: pd.DataFrame, clean_df: pd.DataFrame) -> float:
             pass
 
     except Exception:
-        return float(0.01)
+        return float(0.001)
 
     return _clamp(score)
 
@@ -180,7 +180,7 @@ def score_hard_task(agent_df: pd.DataFrame, clean_df: pd.DataFrame) -> float:
             pass
 
     except Exception:
-        return float(0.01)
+        return float(0.001)
 
     return _clamp(score)
 
@@ -197,7 +197,7 @@ def grade(task_id: str, agent_df: pd.DataFrame, clean_df: pd.DataFrame) -> Dict[
         threshold = 0.40
     else:
         return {
-            "score": float(0.01),
+            "score": float(0.001),
             "passed": False,
             "feedback": f"Unknown task_id: {task_id}"
         }
@@ -209,7 +209,7 @@ def grade(task_id: str, agent_df: pd.DataFrame, clean_df: pd.DataFrame) -> Dict[
         "score": float(score),
         "passed": passed,
         "feedback": (
-            f"Task '{task_id}' scored {score:.2f}/1.0 — "
+            f"Task '{task_id}' scored {score:.3f}/1.0 — "
             f"{'Passed ✅' if passed else 'Failed ❌'} "
             f"(threshold: {threshold})"
         )
