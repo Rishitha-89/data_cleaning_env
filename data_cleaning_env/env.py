@@ -25,28 +25,16 @@ class DataCleaningEnv:
     """
 
     def __init__(self):
-        # Load all 3 tasks on initialization
         self.tasks = get_all_tasks()
         self.current_task = None
-        self.current_task_idx = 0      # Rotates through tasks on each reset
+        self.current_task_idx = 0
         self.step_count = 0
         self.done = False
-        self.max_steps = 10            # Max steps before episode ends
+        self.max_steps = 10
         self.previous_score = 0.0
         self.best_score = 0.0
 
     def reset(self, task_id: str = None) -> Observation:
-        """
-        Reset the environment to start a new episode.
-        
-        Args:
-            task_id: Optional specific task to start with.
-                     If None, rotates through tasks in order.
-        
-        Returns:
-            Initial observation with dirty dataset
-        """
-        # Allow specific task selection or rotate through tasks
         if task_id:
             self.current_task = next(
                 (t for t in self.tasks if t["task_id"] == task_id),
@@ -56,36 +44,24 @@ class DataCleaningEnv:
             self.current_task = self.tasks[self.current_task_idx]
             self.current_task_idx = (self.current_task_idx + 1) % len(self.tasks)
 
-        # Reset episode state
         self.step_count = 0
         self.done = False
-        self.previous_score = 0.0
-        self.best_score = 0.0
+        self.previous_score = 0.01
+        self.best_score = 0.01
 
         return self._make_observation()
 
     def step(self, action: Action) -> Tuple[Observation, Reward, bool, Dict]:
-        """
-        Take a cleaning action and receive feedback.
-        
-        Args:
-            action: Contains task_id and cleaned_data (CSV string)
-        
-        Returns:
-            Tuple of (observation, reward, done, info)
-        """
         if self.done:
             raise ValueError("Episode is done. Call reset() to start new episode.")
 
         self.step_count += 1
 
-        # Find the task this action is for
         task = next(
             (t for t in self.tasks if t["task_id"] == action.task_id),
             None
         )
 
-        # Invalid task ID
         if task is None:
             reward = Reward(
                 score=0.01,
@@ -96,7 +72,6 @@ class DataCleaningEnv:
             self.done = True
             return self._make_observation(), reward, True, {}
 
-        # Parse agent's cleaned CSV
         try:
             agent_df = pd.read_csv(pd.io.common.StringIO(action.cleaned_data))
         except Exception as e:
@@ -109,18 +84,18 @@ class DataCleaningEnv:
             self.done = True
             return self._make_observation(), reward, True, {}
 
-        # Grade the submission
         result = grade(action.task_id, agent_df, task["clean_df"])
 
-        # Calculate improvement over previous attempt
+        # Clamp score strictly between 0 and 1
+        result["score"] = max(0.01, min(round(result["score"], 2), 0.99))
+
         improvement = round(result["score"] - self.previous_score, 2)
 
-        # Penalize if agent makes no progress after 3 steps (anti-gaming)
+        # Penalize no progress after 3 steps
         if self.step_count > 3 and improvement <= 0:
             result["score"] = max(0.01, result["score"] - 0.05)
             result["feedback"] += " ⚠️ No improvement penalty applied"
 
-        # Update state
         self.previous_score = result["score"]
         self.best_score = max(self.best_score, result["score"])
 
@@ -131,7 +106,6 @@ class DataCleaningEnv:
             improvement=improvement
         )
 
-        # End episode if max steps reached or task passed
         if self.step_count >= self.max_steps or reward.passed:
             self.done = True
 
@@ -146,7 +120,6 @@ class DataCleaningEnv:
         return obs, reward, self.done, info
 
     def state(self) -> Dict[str, Any]:
-        """Return current environment state."""
         return {
             "task_id": self.current_task["task_id"] if self.current_task else None,
             "step_count": self.step_count,
@@ -163,7 +136,6 @@ class DataCleaningEnv:
         self.done = True
 
     def _make_observation(self) -> Observation:
-        """Build observation from current task state."""
         task = self.current_task
         return Observation(
             task_id=task["task_id"],
