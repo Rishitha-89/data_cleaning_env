@@ -1,98 +1,167 @@
-import os
-import pandas as pd
-import numpy as np
-from openai import OpenAI
-from data_cleaning_env.env import DataCleaningEnv, Action
+"""
+Baseline Inference Script for Data Cleaning Environment.
 
-# ── Config ───────────────────────────────────────────────────────────────────
+MANDATORY VARIABLES:
+    API_BASE_URL  - API endpoint for the LLM (has default)
+    MODEL_NAME    - Model identifier (has default)
+    HF_TOKEN      - Hugging Face API token (required, no default)
+
+OUTPUT FORMAT (strictly enforced):
+    [START] task=<name> env=<benchmark> model=<model>
+    [STEP]  step=<n> action=<str> reward=<0.00> done=<bool> error=<msg|null>
+    [END]   success=<bool> steps=<n> rewards=<r1,r2,...>
+"""
+import os
+from openai import OpenAI
+from data_cleaning_env.env import DataCleaningEnv
+from data_cleaning_env.models import Action
+
+# ── Environment Variables ─────────────────────────────────────────────────────
 API_BASE_URL = os.getenv("API_BASE_URL", "https://router.huggingface.co/v1")
 MODEL_NAME = os.getenv("MODEL_NAME", "meta-llama/Llama-3.3-70B-Instruct")
 HF_TOKEN = os.getenv("HF_TOKEN")
 
-client = OpenAI(base_url=API_BASE_URL, api_key=HF_TOKEN)
+# HF_TOKEN is required — fail fast with clear message
+if HF_TOKEN is None:
+    raise ValueError("HF_TOKEN environment variable is required")
 
-# ── Prompt ───────────────────────────────────────────────────────────────────
-SYSTEM_PROMPT = """
-You are a data cleaning expert. You will be given a messy CSV dataset.
-Your job is to clean it and return ONLY the cleaned CSV data, nothing else.
-No explanations, no markdown, just the raw CSV text.
+# ── OpenAI Client (mandatory per hackathon rules) ─────────────────────────────
+client = OpenAI(
+    base_url=API_BASE_URL,
+    api_key=HF_TOKEN
+)
+
+# ── System Prompt for Data Cleaning Agent ─────────────────────────────────────
+SYSTEM_PROMPT = """You are an expert data cleaning agent.
+You will receive a messy CSV dataset and must clean it.
+Return ONLY the cleaned CSV data — no explanations, no markdown, no code blocks.
+Just the raw CSV text starting with the header row.
 
 Common issues to fix:
-- Missing values: fill numeric columns with column mean
-- Duplicates: remove duplicate rows
-- Wrong data types: convert to correct types
-- Outliers: replace with column mean
-- Inconsistent formats: standardize (dates, case, etc.)
-- Invalid values: replace negatives with 0 or mean
-"""
+- Missing values: fill numeric columns with the column mean
+- Duplicate rows: remove all duplicates, keep first occurrence
+- Wrong data types: convert age/numeric columns to proper numbers
+- Invalid values: replace "abc", "xyz" etc with column mean
+- Outliers: replace extreme values (e.g. price=999) with column mean
+- Negative values: replace negative stock/quantities with 0
+- Inconsistent case: standardize text to Title Case
+- Date formats: standardize all dates to YYYY-MM-DD format"""
 
-def get_llm_cleaning(dirty_csv: str, description: str) -> str:
-    """Ask LLM to clean the dataset"""
+
+def get_llm_cleaning(dirty_csv: str, description: str) -> tuple[str, str]:
+    """
+    Ask LLM to clean the dataset.
+    
+    Returns:
+        Tuple of (cleaned_csv, error_message or None)
+    """
     try:
         response = client.chat.completions.create(
             model=MODEL_NAME,
             messages=[
                 {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": f"Task: {description}\n\nDirty data:\n{dirty_csv}\n\nReturn only the cleaned CSV:"}
+                {
+                    "role": "user",
+                    "content": (
+                        f"Task: {description}\n\n"
+                        f"Dirty data:\n{dirty_csv}\n\n"
+                        f"Return only the cleaned CSV:"
+                    )
+                }
             ],
             temperature=0.1,
             max_tokens=1000
         )
-        return response.choices[0].message.content.strip()
+        cleaned = response.choices[0].message.content.strip()
+        # Remove markdown code blocks if model added them
+        if cleaned.startswith("```"):
+            cleaned = cleaned.split("\n", 1)[1]
+            cleaned = cleaned.rsplit("```", 1)[0].strip()
+        return cleaned, None
     except Exception as e:
-        return ""
+        return "", str(e)
 
-# ── Logging Helpers (MANDATORY FORMAT) ───────────────────────────────────────
-def log_start(task: str, env: str, model: str) -> None:
-    print(f"[START] task={task} env={env} model={model}", flush=True)
 
-def log_step(step: int, action: str, reward: float, done: bool, error: str) -> None:
-    error_val = error if error else "null"
-    done_val = str(done).lower()
-    print(f"[STEP] step={step} action={action} reward={reward:.2f} done={done_val} error={error_val}", flush=True)
-
-def log_end(success: bool, steps: int, score: float, rewards: list) -> None:
-    rewards_str = ",".join(f"{r:.2f}" for r in rewards)
-    print(f"[END] success={str(success).lower()} steps={steps} score={score:.3f} rewards={rewards_str}", flush=True)
-
-# ── Main ─────────────────────────────────────────────────────────────────────
 def main():
+    """
+    Run baseline agent against all 3 tasks.
+    Outputs strictly formatted [START]/[STEP]/[END] lines.
+    """
     env = DataCleaningEnv()
+    all_rewards = []
 
-    try:
-        # Loop through each task and treat it as a brand new game
-        for task in env.tasks:
-            task_id = task["task_id"]
-            
-            # 1. Log START for this specific task
-            log_start(task=task_id, env="data-cleaning-env", model=MODEL_NAME)
+    for task in env.tasks:
+        task_id = task["task_id"]
+        rewards = []
+        steps = 0
+        success = False
+        last_error = None
 
-            # 2. Get the AI's cleaned data
+        # ── [START] ───────────────────────────────────────────────────────────
+        print(
+            f"[START] task={task_id} env=data-cleaning-env model={MODEL_NAME}",
+            flush=True
+        )
+
+        try:
+            # Reset environment for this task
+            env.reset(task_id=task_id)
+
+            # Get dirty data and ask LLM to clean it
             dirty_csv = task["dirty_df"].to_csv(index=False)
-            cleaned_csv = get_llm_cleaning(dirty_csv, task["description"])
+            cleaned_csv, error = get_llm_cleaning(dirty_csv, task["description"])
 
-            action = Action(
-                task_id=task_id,
-                cleaned_data=cleaned_csv
-            )
+            if error:
+                last_error = error
+                cleaned_csv = dirty_csv  # Fallback to dirty data
 
-            # 3. Reset the environment and point it to the current task
-            env.reset()
-            env.current_task = task 
-            
-            # 4. Take the step
+            # Submit cleaned data to environment
+            action = Action(task_id=task_id, cleaned_data=cleaned_csv)
             obs, reward, done, info = env.step(action)
 
-            # 5. Log the STEP
-            action_name = f"clean_{task_id}_dataset"
-            log_step(step=1, action=action_name, reward=reward.score, done=done, error=None)
+            steps = 1
+            rewards.append(reward.score)
+            success = reward.passed
+            action_str = f"clean_{task_id}_dataset"
 
-            # 6. Log END for this specific task
-            task_success = reward.score >= 0.45  # Passed threshold
-            log_end(success=task_success, steps=1, score=reward.score, rewards=[reward.score])
+            # ── [STEP] ────────────────────────────────────────────────────────
+            print(
+                f"[STEP] step={steps} "
+                f"action={action_str} "
+                f"reward={reward.score:.2f} "
+                f"done={str(done).lower()} "
+                f"error={last_error if last_error else 'null'}",
+                flush=True
+            )
 
-    except Exception as e:
-        print(f"[DEBUG] Error occurred: {e}")
+        except Exception as e:
+            last_error = str(e)
+            steps = max(steps, 1)
+            rewards.append(0.01)
+            print(
+                f"[STEP] step={steps} "
+                f"action=error "
+                f"reward=0.01 "
+                f"done=true "
+                f"error={last_error}",
+                flush=True
+            )
+
+        finally:
+            # ── [END] ─────────────────────────────────────────────────────────
+            env.close()
+            rewards_str = ",".join(f"{r:.2f}" for r in rewards)
+            print(
+                f"[END] success={str(success).lower()} "
+                f"steps={steps} "
+                f"rewards={rewards_str}",
+                flush=True
+            )
+            all_rewards.extend(rewards)
+
+            # Reinitialize env for next task
+            env = DataCleaningEnv()
+
 
 if __name__ == "__main__":
     main()
