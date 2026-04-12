@@ -1,1 +1,1 @@
-# Server package for Data Cleaning Environment
+# Server package

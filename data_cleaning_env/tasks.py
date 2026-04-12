@@ -1,26 +1,8 @@
-"""
-Task definitions for the Data Cleaning Environment.
-
-Three real-world inspired datasets with increasing difficulty:
-- Easy: Employee HR data with missing values
-- Medium: Customer data with duplicates, wrong types, missing values  
-- Hard: Product catalog with outliers, inconsistent formats, invalid values
-"""
 from __future__ import annotations
 import pandas as pd
-import numpy as np
 
 
 def get_easy_task() -> dict:
-    """
-    Easy Task: Fix missing values in an employee HR dataset.
-    
-    Real-world scenario: HR system exports often have incomplete records
-    where employees haven't filled in all their profile fields.
-    
-    Issues: Missing age, salary, years_exp values
-    Fix: Fill with column mean
-    """
     dirty_data = {
         "name": ["Alice", "Bob", "Charlie", "David", "Eve",
                  "Frank", "Grace", "Henry", "Iris", "Jack"],
@@ -30,7 +12,6 @@ def get_easy_task() -> dict:
                        "IT", "HR", "Finance", "IT", "HR"],
         "years_exp": [2, 5, None, 3, None, 8, 6, None, 4, 3]
     }
-
     clean_data = {
         "name": ["Alice", "Bob", "Charlie", "David", "Eve",
                  "Frank", "Grace", "Henry", "Iris", "Jack"],
@@ -40,7 +21,6 @@ def get_easy_task() -> dict:
                        "IT", "HR", "Finance", "IT", "HR"],
         "years_exp": [2, 5, 4.8, 3, 4.8, 8, 6, 4.8, 4, 3]
     }
-
     return {
         "task_id": "easy",
         "description": (
@@ -56,15 +36,6 @@ def get_easy_task() -> dict:
 
 
 def get_medium_task() -> dict:
-    """
-    Medium Task: Fix customer data with multiple issues.
-    
-    Real-world scenario: Customer database exports from legacy systems
-    often have duplicate records, type mismatches, and missing values.
-    
-    Issues: Duplicate rows, wrong data types (age as string), missing purchase amounts
-    Fix: Remove duplicates, convert types, fill missing values
-    """
     dirty_data = {
         "customer_id": [101, 102, 102, 103, 104, 104, 105, 106, 107, 107],
         "name": ["John", "Jane", "Jane", "Bob", "Alice", "Alice",
@@ -78,7 +49,6 @@ def get_medium_task() -> dict:
         "city": ["NYC", "LA", "LA", "NYC", "Chicago", "Chicago",
                  "LA", "NYC", "Chicago", "Chicago"]
     }
-
     clean_data = {
         "customer_id": [101, 102, 103, 104, 105, 106, 107],
         "name": ["John", "Jane", "Bob", "Alice", "Charlie", "Diana", "Eve"],
@@ -88,12 +58,12 @@ def get_medium_task() -> dict:
                   "alice@mail.com", "charlie@mail.com", "diana@mail.com", "eve@mail.com"],
         "city": ["NYC", "LA", "NYC", "Chicago", "LA", "NYC", "Chicago"]
     }
-
     return {
         "task_id": "medium",
         "description": (
             "Fix this customer dataset. "
-            "Remove duplicate rows, convert age column to numeric (replace invalid values with mean), "
+            "Remove duplicate rows, convert age column to numeric "
+            "(replace invalid values with mean), "
             "and fill missing purchase_amount values with the column mean."
         ),
         "dirty_df": pd.DataFrame(dirty_data),
@@ -104,16 +74,6 @@ def get_medium_task() -> dict:
 
 
 def get_hard_task() -> dict:
-    """
-    Hard Task: Fix a product catalog with many complex issues.
-    
-    Real-world scenario: E-commerce product databases merged from multiple
-    sources often have inconsistent formatting, outliers, and invalid values.
-    
-    Issues: Duplicates, outlier prices, inconsistent date formats,
-            negative stock values, inconsistent category casing, rating outliers
-    Fix: All of the above
-    """
     dirty_data = {
         "product_id": [1, 2, 2, 3, 4, 5, 6, 7, 8, 8],
         "product_name": ["Apple", "banana", "banana", "CHERRY",
@@ -127,7 +87,6 @@ def get_hard_task() -> dict:
                      "fruit", "Fruit", "fruit", "FRUIT", "Fruit", "Fruit"],
         "rating": [4.5, 3.8, 3.8, 4.2, 1.0, 4.7, None, 4.1, 3.9, 3.9]
     }
-
     clean_data = {
         "product_id": [1, 2, 3, 4, 5, 6, 7, 8],
         "product_name": ["Apple", "Banana", "Cherry", "Date",
@@ -140,7 +99,6 @@ def get_hard_task() -> dict:
                      "Fruit", "Fruit", "Fruit", "Fruit"],
         "rating": [4.5, 3.8, 4.2, 4.0, 4.7, 4.0, 4.1, 3.9]
     }
-
     return {
         "task_id": "hard",
         "description": (
@@ -161,5 +119,4 @@ def get_hard_task() -> dict:
 
 
 def get_all_tasks() -> list:
-    """Return all 3 tasks in order of difficulty."""
     return [get_easy_task(), get_medium_task(), get_hard_task()]

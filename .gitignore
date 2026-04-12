@@ -1,5 +1,9 @@
 .env
-__pycache__
 __pycache__/
 *.pyc
-.git
+*.pyo
+.git/
+*.egg-info/
+dist/
+build/
+outputs/

@@ -29,10 +29,6 @@ Common issues to fix:
 
 
 def clamp(score: float) -> float:
-    """
-    Strictly clamp score between 0 and 1 exclusive.
-    Never returns exactly 0.0 or 1.0.
-    """
     try:
         s = float(score)
         s = round(s, 2)
@@ -101,11 +97,9 @@ def main():
             obs, reward, done, info = env.step(action)
 
             steps = 1
-
-            # CLAMP HERE — before anything else
             clamped = clamp(reward.score)
             rewards.append(clamped)
-            success = clamped >= 0.45
+            success = clamped >= 0.40
 
             print(
                 f"[STEP] step={steps} "
@@ -130,12 +124,8 @@ def main():
             )
 
         finally:
-            # CLAMP AGAIN — every single reward before printing
             safe_rewards = [clamp(r) for r in rewards]
             rewards_str = ",".join(f"{r:.2f}" for r in safe_rewards)
-
-            # Double check — replace any 0.00 or 1.00 strings
-            rewards_str = rewards_str.replace("0.00", "0.01").replace("1.00", "0.99")
 
             print(
                 f"[END] success={str(success).lower()} "

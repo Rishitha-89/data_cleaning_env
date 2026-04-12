@@ -1,29 +1,12 @@
-"""
-Core Data Cleaning Environment.
-
-Implements the OpenEnv interface:
-- reset() → initial observation
-- step(action) → observation, reward, done, info  
-- state() → current environment state
-- close() → cleanup
-"""
 from __future__ import annotations
 import pandas as pd
 from typing import Any, Dict, Tuple
-
 from .models import Observation, Action, Reward
 from .tasks import get_all_tasks
 from .graders import grade
 
 
 class DataCleaningEnv:
-    """
-    A real-world RL environment for training AI agents to clean messy datasets.
-    
-    The agent receives dirty datasets and must return cleaned versions.
-    Rewards are based on how well the agent cleans the data.
-    """
-
     def __init__(self):
         self.tasks = get_all_tasks()
         self.current_task = None
@@ -31,8 +14,8 @@ class DataCleaningEnv:
         self.step_count = 0
         self.done = False
         self.max_steps = 10
-        self.previous_score = 0.0
-        self.best_score = 0.0
+        self.previous_score = 0.01
+        self.best_score = 0.01
 
     def reset(self, task_id: str = None) -> Observation:
         if task_id:
@@ -48,7 +31,6 @@ class DataCleaningEnv:
         self.done = False
         self.previous_score = 0.01
         self.best_score = 0.01
-
         return self._make_observation()
 
     def step(self, action: Action) -> Tuple[Observation, Reward, bool, Dict]:
@@ -85,22 +67,19 @@ class DataCleaningEnv:
             return self._make_observation(), reward, True, {}
 
         result = grade(action.task_id, agent_df, task["clean_df"])
+        score = result["score"]
 
-        # Clamp score strictly between 0 and 1
-        result["score"] = max(0.01, min(round(result["score"], 2), 0.99))
+        improvement = round(score - self.previous_score, 2)
 
-        improvement = round(result["score"] - self.previous_score, 2)
-
-        # Penalize no progress after 3 steps
         if self.step_count > 3 and improvement <= 0:
-            result["score"] = max(0.01, result["score"] - 0.05)
-            result["feedback"] += " ⚠️ No improvement penalty applied"
+            score = max(0.01, score - 0.05)
+            result["feedback"] += " ⚠️ No improvement penalty"
 
-        self.previous_score = result["score"]
-        self.best_score = max(self.best_score, result["score"])
+        self.previous_score = score
+        self.best_score = max(self.best_score, score)
 
         reward = Reward(
-            score=result["score"],
+            score=score,
             passed=result["passed"],
             feedback=result["feedback"],
             improvement=improvement
@@ -131,7 +110,6 @@ class DataCleaningEnv:
         }
 
     def close(self) -> None:
-        """Cleanup environment resources."""
         self.current_task = None
         self.done = True
 

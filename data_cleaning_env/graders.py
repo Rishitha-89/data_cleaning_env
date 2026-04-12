@@ -1,10 +1,3 @@
-"""
-Grading logic for the Data Cleaning Environment.
-
-Each grader scores the agent's cleaned dataset against the expected output.
-Scores are strictly between 0.0 and 1.0 (exclusive) with partial credit.
-Maximum possible score is 0.97 — mathematically impossible to hit 1.0.
-"""
 from __future__ import annotations
 import pandas as pd
 import numpy as np
@@ -12,7 +5,7 @@ from typing import Dict, Any
 
 
 def _clamp(score: float) -> float:
-    """Ensure score is strictly between 0 and 1 (exclusive)."""
+    """Score must be strictly between 0 and 1 exclusive."""
     try:
         s = float(score)
         s = round(s, 2)
@@ -26,31 +19,16 @@ def _clamp(score: float) -> float:
 
 
 def score_easy_task(agent_df: pd.DataFrame, clean_df: pd.DataFrame) -> float:
-    """
-    Grade easy task: missing value imputation.
-
-    Weights are designed so max possible score = 0.97
-    This makes it mathematically impossible to return exactly 1.0
-
-    Checks:
-    - No missing values remain (0.29)
-    - Age filled correctly with mean (0.24)
-    - Salary filled correctly with mean (0.24)
-    - Years exp filled (0.10)
-    - Other columns unchanged (0.10)
-    Max possible = 0.97
-    """
     score = 0.0
-
     try:
-        # Check 1: No missing values remaining (0.29)
+        # Check 1: No missing values (0.29)
         missing = agent_df.isnull().sum().sum()
         if missing == 0:
             score += 0.29
         elif missing <= 2:
-            score += 0.14  # Partial credit
+            score += 0.14
 
-        # Check 2: Age filled correctly within 1.0 tolerance (0.24)
+        # Check 2: Age filled correctly (0.24)
         try:
             expected_age = clean_df["age"].values.astype(float)
             agent_age = agent_df["age"].fillna(0).values.astype(float)
@@ -59,7 +37,7 @@ def score_easy_task(agent_df: pd.DataFrame, clean_df: pd.DataFrame) -> float:
         except Exception:
             pass
 
-        # Check 3: Salary filled correctly within 500 tolerance (0.24)
+        # Check 3: Salary filled correctly (0.24)
         try:
             expected_sal = clean_df["salary"].values.astype(float)
             agent_sal = agent_df["salary"].fillna(0).values.astype(float)
@@ -75,7 +53,7 @@ def score_easy_task(agent_df: pd.DataFrame, clean_df: pd.DataFrame) -> float:
         except Exception:
             pass
 
-        # Check 5: Name and department columns unchanged (0.10)
+        # Check 5: Other columns unchanged (0.10)
         try:
             if (list(agent_df["name"]) == list(clean_df["name"]) and
                     list(agent_df["department"]) == list(clean_df["department"])):
@@ -86,32 +64,18 @@ def score_easy_task(agent_df: pd.DataFrame, clean_df: pd.DataFrame) -> float:
     except Exception:
         return 0.01
 
-    # Max possible = 0.29 + 0.24 + 0.24 + 0.10 + 0.10 = 0.97
+    # Max possible = 0.29+0.24+0.24+0.10+0.10 = 0.97
     return _clamp(score)
 
 
 def score_medium_task(agent_df: pd.DataFrame, clean_df: pd.DataFrame) -> float:
-    """
-    Grade medium task: duplicates, type conversion, missing values.
-
-    Weights designed so max possible score = 0.97
-
-    Checks:
-    - Correct number of rows after dedup (0.24)
-    - No missing values (0.19)
-    - Age is numeric type (0.19)
-    - Purchase amounts correct (0.19)
-    - No invalid age values (0.16)
-    Max possible = 0.97
-    """
     score = 0.0
-
     try:
-        # Check 1: Duplicates removed — correct row count (0.24)
+        # Check 1: Duplicates removed (0.24)
         if len(agent_df) == len(clean_df):
             score += 0.24
         elif len(agent_df) <= len(clean_df) + 1:
-            score += 0.10  # Partial credit
+            score += 0.10
 
         # Check 2: No missing values (0.19)
         missing = agent_df.isnull().sum().sum()
@@ -120,16 +84,16 @@ def score_medium_task(agent_df: pd.DataFrame, clean_df: pd.DataFrame) -> float:
         elif missing <= 1:
             score += 0.09
 
-        # Check 3: Age column is numeric (0.19)
+        # Check 3: Age is numeric (0.19)
         try:
             if pd.api.types.is_numeric_dtype(agent_df["age"]):
                 score += 0.19
             elif agent_df["age"].apply(lambda x: str(x).isdigit()).sum() > 3:
-                score += 0.09  # Partial credit
+                score += 0.09
         except Exception:
             pass
 
-        # Check 4: Purchase amounts are correct (0.19)
+        # Check 4: Purchase amounts correct (0.19)
         try:
             expected = clean_df["purchase_amount"].values.astype(float)
             agent = agent_df["purchase_amount"].fillna(0).values.astype(float)
@@ -139,7 +103,7 @@ def score_medium_task(agent_df: pd.DataFrame, clean_df: pd.DataFrame) -> float:
         except Exception:
             pass
 
-        # Check 5: No invalid age values between 18-100 (0.16)
+        # Check 5: No invalid ages (0.16)
         try:
             ages = pd.to_numeric(agent_df["age"], errors="coerce")
             valid = ages.between(18, 100).sum()
@@ -150,28 +114,12 @@ def score_medium_task(agent_df: pd.DataFrame, clean_df: pd.DataFrame) -> float:
     except Exception:
         return 0.01
 
-    # Max possible = 0.24 + 0.19 + 0.19 + 0.19 + 0.16 = 0.97
+    # Max possible = 0.24+0.19+0.19+0.19+0.16 = 0.97
     return _clamp(score)
 
 
 def score_hard_task(agent_df: pd.DataFrame, clean_df: pd.DataFrame) -> float:
-    """
-    Grade hard task: outliers, formats, case, invalid values.
-
-    Weights designed so max possible score = 0.97
-
-    Checks:
-    - Duplicates removed (0.14)
-    - Product names in Title Case (0.14)
-    - No negative stock (0.14)
-    - Outlier prices replaced (0.14)
-    - Category case consistent (0.14)
-    - Dates in YYYY-MM-DD format (0.14)
-    - Ratings within valid range (0.13)
-    Max possible = 0.97
-    """
     score = 0.0
-
     try:
         # Check 1: Duplicates removed (0.14)
         if len(agent_df) == len(clean_df):
@@ -179,7 +127,7 @@ def score_hard_task(agent_df: pd.DataFrame, clean_df: pd.DataFrame) -> float:
         elif len(agent_df) <= len(clean_df) + 1:
             score += 0.07
 
-        # Check 2: Product names in Title Case (0.14)
+        # Check 2: Product names Title Case (0.14)
         try:
             names = agent_df["product_name"].dropna().tolist()
             title_count = sum(1 for n in names if n == n.title())
@@ -187,7 +135,7 @@ def score_hard_task(agent_df: pd.DataFrame, clean_df: pd.DataFrame) -> float:
         except Exception:
             pass
 
-        # Check 3: No negative stock values (0.14)
+        # Check 3: No negative stock (0.14)
         try:
             stock = agent_df["stock"].dropna()
             valid = (stock >= 0).sum()
@@ -205,7 +153,7 @@ def score_hard_task(agent_df: pd.DataFrame, clean_df: pd.DataFrame) -> float:
         except Exception:
             pass
 
-        # Check 5: Category case consistent (0.14)
+        # Check 5: Category consistent (0.14)
         try:
             categories = agent_df["category"].dropna()
             unique_lower = set(c.lower() for c in categories)
@@ -214,7 +162,7 @@ def score_hard_task(agent_df: pd.DataFrame, clean_df: pd.DataFrame) -> float:
         except Exception:
             pass
 
-        # Check 6: Dates in YYYY-MM-DD format (0.14)
+        # Check 6: Dates in YYYY-MM-DD (0.14)
         try:
             dates = agent_df["date_added"].dropna()
             consistent = sum(
@@ -225,7 +173,7 @@ def score_hard_task(agent_df: pd.DataFrame, clean_df: pd.DataFrame) -> float:
         except Exception:
             pass
 
-        # Check 7: Ratings within valid range 1.0-5.0 (0.13)
+        # Check 7: Ratings 1.0-5.0 (0.13)
         try:
             ratings = agent_df["rating"].dropna()
             valid = ratings.between(1.0, 5.0).sum()
@@ -241,41 +189,20 @@ def score_hard_task(agent_df: pd.DataFrame, clean_df: pd.DataFrame) -> float:
 
 
 def grade(task_id: str, agent_df: pd.DataFrame, clean_df: pd.DataFrame) -> Dict[str, Any]:
-    """
-    Main grader function — scores any task by ID.
-
-    Args:
-        task_id: "easy", "medium", or "hard"
-        agent_df: The agent's cleaned DataFrame
-        clean_df: The expected clean DataFrame
-
-    Returns:
-        Dict with score strictly between 0 and 1 (exclusive),
-        passed (bool), and feedback (str)
-    """
     if task_id == "easy":
         score = score_easy_task(agent_df, clean_df)
         threshold = 0.60
-
     elif task_id == "medium":
         score = score_medium_task(agent_df, clean_df)
         threshold = 0.50
-
     elif task_id == "hard":
         score = score_hard_task(agent_df, clean_df)
         threshold = 0.40
-
     else:
-        return {
-            "score": 0.01,
-            "passed": False,
-            "feedback": f"Unknown task_id: {task_id}"
-        }
+        return {"score": 0.01, "passed": False, "feedback": f"Unknown task_id: {task_id}"}
 
-    # Final clamp — strictly between 0 and 1
     score = _clamp(score)
     passed = score >= threshold
-
     return {
         "score": score,
         "passed": passed,
